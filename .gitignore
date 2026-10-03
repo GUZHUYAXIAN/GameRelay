@@ -1,0 +1,10 @@
+/private/
+/data/
+/artifacts/
+/dist/
+/build/
+*.user
+*.suo
+.vs/
+bin/
+obj/
