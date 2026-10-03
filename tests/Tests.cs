@@ -95,6 +95,19 @@ class Tests
             Test("timeout disabled", delegate {
                 var s = Make(1); s.Instances[0].TimeoutMinutes = 0; var r = new Runtime(); var e = QueueAll(s, r); e.Tick(now); e.Tick(now + TimeSpan.FromDays(100).Ticks); Check(r.Kills == 0, "disabled timeout");
             });
+            Test("disabled automatic recovery preserves failed or overdue tasks without cleanup or retry", delegate {
+                foreach (bool failed in new[] { false, true })
+                {
+                    var s = Make(1); s.Instances[0].TimeoutMinutes = failed ? 0 : 1; s.Instances[0].AutomaticRecoveryDisabled = true;
+                    string dir = Path.Combine(Path.GetTempPath(), "GameRelay-no-recovery-" + Guid.NewGuid().ToString("N"));
+                    var store = new JsonStore(dir); store.Save(s); s = new JsonStore(dir).Load();
+                    Check(s.Instances[0].AutomaticRecoveryDisabled, "recovery preference not persisted");
+                    var r = new Runtime(); var e = QueueAll(s, r); e.Tick(now);
+                    r.Status[s.Instances[0].Id].Failed = failed;
+                    e.Tick(now + TimeSpan.FromMinutes(2).Ticks); e.Tick(now + TimeSpan.FromDays(1).Ticks);
+                    Check(s.Runs[0].State == "NeedsAttention" && r.Kills == 0 && r.Starts.Count == 1 && s.Runs[0].Attempt == 0, "disabled recovery touched task");
+                }
+            });
             Test("offline years merge one debt per schedule", delegate {
                 var s = Make(2); var r = new Runtime(); s.Paused = true;
                 s.Schedules.Add(Plan(s.Instances[0], now)); s.Schedules.Add(Plan(s.Instances[1], now));

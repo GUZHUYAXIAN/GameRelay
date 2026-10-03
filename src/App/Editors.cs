@@ -51,6 +51,7 @@ namespace GameRelay.App
             var resourceExe = Field("游戏/资源 EXE 路径", input.ResourceProcess, false);
             var mumu = Field("MuMuManager.exe（可选）", input.MuMuManager, false); var mumuIndex = Field("MuMu 索引（-1 未绑定）", input.MuMuIndex.ToString(), false);
             var timeout = Field("超时分钟（0 关闭）", input.TimeoutMinutes.ToString(), false); var order = Field("同时间排序（小者优先）", input.Order.ToString(), false);
+            var recovery = new CheckBox { Text = "允许归属核实后的自动清理与一次重试（首轮验收可关闭）", AutoSize = true, Checked = !input.AutomaticRecoveryDisabled }; Add("异常恢复", recovery);
             var auto = new CheckBox { Text = "我已核对：启动后会自动执行所选配置", AutoSize = true, Checked = input.AutoRunVerified }; Add("自动执行核对", auto);
             var resource = new CheckBox { Text = "我已核对目标映射及残留资源探测", AutoSize = true, Checked = input.ResourceVerified }; Add("资源核对", resource);
             Add("边界", new Label { Text = "修改目录、入口或参数后需重新核对。仅进程型自定义任务可使用 process-only:<实例ID>。\n能力核对不等于真实运行验收通过。不要在参数中填写密码或令牌。", AutoSize = true, MaximumSize = new Size(520, 0) });
@@ -64,6 +65,7 @@ namespace GameRelay.App
                 Result.Target = target.Text.Trim(); Result.ResourceHost = host.Text.Trim(); Result.ResourcePort = resourcePort; Result.ResourceProcess = resourceExe.Text.Trim();
                 Result.MuMuManager = mumu.Text.Trim(); Result.MuMuIndex = index;
                 Result.TimeoutMinutes = minutes; Result.Order = rank; Result.AutoRunVerified = auto.Checked; Result.ResourceVerified = resource.Checked;
+                Result.AutomaticRecoveryDisabled = !recovery.Checked;
                 Result.Fingerprint = Discovery.Fingerprint(Result); Result.RealRunVerified = false;
                 if (Result.ObserveOnly) { Result.Enabled = false; Result.AutoRunVerified = false; }
             });

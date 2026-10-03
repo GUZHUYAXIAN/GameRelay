@@ -85,6 +85,7 @@ namespace GameRelay.Core
                 bool timeout = i.TimeoutMinutes > 0 && now - run.StartedUtc >= TimeSpan.FromMinutes(i.TimeoutMinutes).Ticks;
                 if (timeout || o.Failed)
                 {
+                    if (i.AutomaticRecoveryDisabled) { Attention(run, now, "自动恢复已关闭：超时或异常仅提示，未清理、未重试"); continue; }
                     run.State = "Cleaning"; run.Reason = timeout ? "超过最长运行时间" : "进程明确异常退出";
                     Data.Record(now, "清理", run, run.Reason); store.Save(Data);
                     if (!runtime.Cleanup(i, run)) { Attention(run, now, "清理失败或资源残留；未启动重试"); continue; }

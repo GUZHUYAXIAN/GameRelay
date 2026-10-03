@@ -27,6 +27,7 @@ namespace GameRelay.Core
         public bool AutoRunVerified { get; set; }
         public bool RealRunVerified { get; set; }
         public int TimeoutMinutes { get; set; }
+        public bool AutomaticRecoveryDisabled { get; set; }
         public int Order { get; set; }
         public string Capability { get; set; }
         public ScriptInstance()

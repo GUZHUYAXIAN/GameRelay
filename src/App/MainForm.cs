@@ -135,6 +135,7 @@ namespace GameRelay.App
                         if (engine.Data.Runs.Any(r => r.InstanceId == old.Id && (r.Active || r.Pending))) throw new InvalidOperationException("先取消排队并处理占用，再重新读取");
                         var fresh = Discovery.Detect(old.Directory); if (fresh == null) throw new InvalidOperationException("未能重新识别原目录");
                         fresh.Id = old.Id; fresh.Name = old.Name; fresh.Order = old.Order; fresh.TimeoutMinutes = old.TimeoutMinutes;
+                        fresh.AutomaticRecoveryDisabled = old.AutomaticRecoveryDisabled;
                         engine.Data.Instances[engine.Data.Instances.IndexOf(old)] = fresh;
                     }
                 });
