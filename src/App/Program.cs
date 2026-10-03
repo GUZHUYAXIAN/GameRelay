@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Diagnostics;
 using System.Drawing;
 using System.Threading;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using GameRelay.Core;
 using GameRelay.Infrastructure;
@@ -17,6 +18,19 @@ namespace GameRelay.App
     {
         [STAThread]
         static int Main(string[] args)
+        {
+            try { StartupLoader.LoadCore(); return Run(args); }
+            catch (Exception error) { return ReportError(args, error); }
+        }
+        private static int ReportError(string[] args, Exception error)
+        {
+            string message = "GameRelay 未启动调度。请保留 data 目录及备份。\n0x" + error.HResult.ToString("X8") + " · " + error.Message;
+            if (args.Length > 0 && args[0].StartsWith("--", StringComparison.Ordinal)) Console.Error.WriteLine(message);
+            else MessageBox.Show(message, "GameRelay · 游序", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 1;
+        }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static int Run(string[] args)
         {
             bool first;
             using (var mutex = new Mutex(true, @"Local\GameRelay.SingleScheduler.v1", out first))
@@ -61,7 +75,7 @@ namespace GameRelay.App
                 }
                 catch (Exception error)
                 {
-                    MessageBox.Show("GameRelay 未启动调度。请保留 data 目录及备份。\n" + error.Message, "GameRelay · 游序", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1;
+                    return ReportError(args, error);
                 }
                 finally { mutex.ReleaseMutex(); }
             }

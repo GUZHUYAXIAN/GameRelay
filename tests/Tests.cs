@@ -31,6 +31,25 @@ class Tests
     static long now = new DateTime(2026, 1, 5, 0, 0, 0, DateTimeKind.Utc).Ticks;
     static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
     static void Test(string name, Action action) { action(); Console.WriteLine("PASS " + name); passed++; }
+    static string StartupFixture(string parent)
+    {
+        string scope = Path.Combine(parent, "startup " + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(scope);
+        foreach (string name in new[] { "GameRelay.exe", "GameRelay.Core.dll" }) File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, name), Path.Combine(scope, name));
+        return scope;
+    }
+    static Process StartupCheck(string scope)
+    {
+        return Process.Start(new ProcessStartInfo(Path.Combine(scope, "GameRelay.exe"), "--check " + OwnedProcess.Quote(Path.Combine(scope, "data")))
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true });
+    }
+    static FileStream LockCore(string scope)
+    {
+        for (int n = 0; ; n++)
+        {
+            try { return new FileStream(Path.Combine(scope, "GameRelay.Core.dll"), FileMode.Open, FileAccess.Read, FileShare.None); }
+            catch (IOException e) { if ((e.HResult & 0xffff) != 32 || n >= 20) throw; Thread.Sleep(100); }
+        }
+    }
     static State Make(int count)
     {
         var s = new State();
@@ -291,6 +310,30 @@ class Tests
             }
             using (var first = Process.Start(new ProcessStartInfo(manager, "--check " + OwnedProcess.Quote(data)) { UseShellExecute = false, CreateNoWindow = true }))
             { Check(first.WaitForExit(5000) && first.ExitCode == 0 && File.Exists(Path.Combine(data, "check.txt")), "portable data check"); }
+        });
+        Test("startup waits for a temporary DLL lock before loading the scheduler", delegate {
+            string scope = StartupFixture(dir); Process process;
+            using (var locked = LockCore(scope))
+            {
+                process = StartupCheck(scope); Thread.Sleep(750);
+                Check(!process.HasExited && !Directory.Exists(Path.Combine(scope, "data")), "startup did not wait before touching data");
+            }
+            using (process) { Check(process.WaitForExit(8000) && process.ExitCode == 0 && File.Exists(Path.Combine(scope, "data", "check.txt")), "startup did not recover after lock release"); }
+        });
+        Test("persistent DLL lock fails within a bounded time without data or task launch", delegate {
+            string scope = StartupFixture(dir); var watch = Stopwatch.StartNew();
+            using (var locked = LockCore(scope))
+            using (var process = StartupCheck(scope))
+            {
+                Check(process.WaitForExit(8000) && process.ExitCode == 1, "startup lock wait unbounded or failure hidden");
+                Check(process.StandardError.ReadToEnd().Contains("80070020") && !Directory.Exists(Path.Combine(scope, "data")), "startup lock failure not reported");
+            }
+            Check(watch.ElapsedMilliseconds < 8000, "startup wait exceeded bound");
+        });
+        Test("invalid startup DLL fails without retrying application execution", delegate {
+            string scope = StartupFixture(dir); File.WriteAllText(Path.Combine(scope, "GameRelay.Core.dll"), "invalid assembly fixture");
+            using (var process = StartupCheck(scope))
+            { Check(process.WaitForExit(5000) && process.ExitCode == 1 && !Directory.Exists(Path.Combine(scope, "data")), "invalid assembly started application"); }
         });
         Test("renamed MFA entry is discovered via metadata and keeps its own configuration", delegate {
             string scope = Path.Combine(dir, "MFA 客户端"); Directory.CreateDirectory(scope); Directory.CreateDirectory(Path.Combine(scope, "config"));
